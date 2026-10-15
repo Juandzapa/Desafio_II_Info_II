@@ -3,7 +3,6 @@
 #include <fstream>
 #include <cstdlib> 
 #include <ctime>   
-
 using namespace std;
 
 //CONSTRUCTORES Y DESTRUCTOR
@@ -20,7 +19,6 @@ RedSocial::RedSocial() {
             amistades[i][j] = false;
         }
     }
-
     iteraciones_actuales = 0;
     indice_sesion_actual = -1;
     mejores_amigos_inicializados = false;
@@ -29,7 +27,6 @@ RedSocial::RedSocial() {
     for (int i = 0; i < 3; i++) {
         mejores_amigos_indices[i] = -1;
     }
-
     srand(time(0)); 
 }
 
@@ -337,23 +334,55 @@ void RedSocial::mostrar_sugerencias_amistad(int k, int indice_usuario) {
             sugeridos[indice_maximo] = temp_s;
         }
     }
-
-    cout << "\n-- Top " << k << " sugerencias de amistad --\n";
+    cout << "\n Top " << k << " sugerencias de amistad\n";
     for (int i = 0; i < limite; i++) {
         cout << i+1 << ". " << usuarios[sugeridos[i]].getnombre_usuario() 
              << " (" << comunes[i] << " amigos en comun)\n";
     }
-
     delete[] sugeridos;
     delete[] comunes;
 }
 
 bool RedSocial::existe_solicitud(int indice_emisor, int indice_receptor) const { return false; }
 bool RedSocial::album_visible(int indice_visitante, int indice_dueno, const Album& album) const { return false; }
-bool RedSocial::enviar_solicitud_amistad(int indice_emisor, int indice_receptor) { return true; }
+
+bool RedSocial::enviar_solicitud_amistad(int indice_emisor, int indice_receptor) {
+    if (indice_emisor < 0 || indice_emisor >= cantidad_usuarios ||
+        indice_receptor < 0 || indice_receptor >= cantidad_usuarios ||
+        indice_emisor == indice_receptor) {
+        return false;
+    }
+    if (son_amigos(indice_emisor, indice_receptor)) {
+        return false;
+    }
+    string nombre_emisor = usuarios[indice_emisor].getnombre_usuario();
+    Solicitudes nueva_solicitud(nombre_emisor, "Pendiente");
+
+    usuarios[indice_receptor].agregar_solicitud(nueva_solicitud);
+    return true;
+}
+
 bool RedSocial::aceptar_solicitud_amistad(int indice_receptor, int indice_solicitante) { return true; }
 bool RedSocial::rechazar_solicitud_amistad(int indice_receptor, int indice_solicitante) { return true; }
-void RedSocial::mostrar_solicitudes_recibidas(int indice_usuario) const {}
+
+void RedSocial::mostrar_solicitudes_recibidas(int indice_usuario) const {
+    if (indice_usuario < 0 || indice_usuario >= cantidad_usuarios) return;
+
+    const Usuario& usuario_actual = usuarios[indice_usuario];
+    int cant_solicitudes = usuario_actual.getcantidad_solicitudes();
+
+    cout << "\nSolicitudes de Amistad Recibidas\n";
+    if (cant_solicitudes == 0) {
+        cout << "No tienes solicitudes pendientes.\n";
+        return;
+    }
+    for (int i = 0; i < cant_solicitudes; i++) {
+        const Solicitudes* sol = usuario_actual.obtener_solicitud(i);
+        if (sol != nullptr) {
+            cout << i + 1 << ". Emisor: " << (*sol).getEmisor() << " | Fecha: " << (*sol).getFechaEnvio() << endl;
+        }
+    }
+}
 void RedSocial::visitar_perfil_amigo(int indice_usuario, const string& nombre_amigo) {}
 bool RedSocial::enviar_mensaje(int indice_emisor, const string& nombre_receptor, const string& texto, const string& fecha_envio) { return true; }
 void RedSocial::leer_mensajes_nuevos(int indice_usuario) {}
@@ -388,7 +417,7 @@ size_t RedSocial::calcular_memoria() const {
 }
 
 void RedSocial::reportar_consumo(const string& nombre_funcionalidad, size_t memoria_local_aproximada) const {
-    cout << "\n-- Reporte de eficiencia: " << nombre_funcionalidad << " --" << endl;
+    cout << "\nReporte de eficiencia: " << nombre_funcionalidad << endl;
     cout << "Iteraciones: " << iteraciones_actuales << endl;
     cout << "Memoria usada (bytes): " << calcular_memoria() + memoria_local_aproximada << endl;
 }
