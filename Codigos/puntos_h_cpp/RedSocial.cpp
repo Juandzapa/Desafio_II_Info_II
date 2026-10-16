@@ -352,7 +352,25 @@ bool RedSocial::existe_solicitud(int indice_emisor, int indice_receptor) const {
     return (usuarios[indice_receptor].buscar_solicitud(nombre_emisor) != -1);
 }
 
-bool RedSocial::album_visible(int indice_visitante, int indice_dueno, const Album& album) const { return false; }
+bool RedSocial::album_visible(int indice_visitante, int indice_dueno, const Album& album) const {
+    short privacidad = album.getPrivacidad(); 
+    
+    // Convencion numerica de privacidad (short): 0 = Publico, 1 = Amigos, 2 = Privado
+    if (privacidad == 0) {
+        return true;
+    }
+    
+    if (privacidad == 1 && son_amigos(indice_visitante, indice_dueno)) {
+        return true;
+    }
+    
+    if (indice_visitante == indice_dueno) {
+        return true;
+    }
+    
+    return false;
+}
+
 
 bool RedSocial::enviar_solicitud_amistad(int indice_emisor, int indice_receptor) {
     if (indice_emisor < 0 || indice_emisor >= cantidad_usuarios ||
@@ -411,7 +429,108 @@ void RedSocial::mostrar_solicitudes_recibidas(int indice_usuario) const {
         }
     }
 }
-void RedSocial::visitar_perfil_amigo(int indice_usuario, const string& nombre_amigo) {}
+
+void RedSocial::visitar_perfil_amigo(int indice_usuario, const string& nombre_amigo) {
+    int indice_amigo = Buscar_usuario(nombre_amigo);
+    if (indice_amigo == -1) {
+        cout << "Error: El usuario no existe.\n";
+        return;
+    }
+    if (!son_amigos(indice_usuario, indice_amigo)) {
+        cout << "Error: " << nombre_amigo << " no es tu amigo. No puedes ver sus albumes.\n";
+        return;
+    }
+    Usuario& amigo = usuarios[indice_amigo];
+    int cant_albumes = amigo.getcantidad_albumes();
+    
+    int* indices_visibles = new int[cant_albumes];
+    int cant_visibles = 0;
+
+    cout << "\n-- Perfil de " << nombre_amigo << " --\n";
+    cout << "Albumes disponibles:\n";
+    
+    for (int i = 0; i < cant_albumes; i++) {
+        Album* alb = amigo.obtener_album(i);
+        if (alb != nullptr && album_visible(indice_usuario, indice_amigo, *alb)) {
+            indices_visibles[cant_visibles] = i;
+            
+            string texto_privacidad = "Desconocido";
+            if (alb->getPrivacidad() == 0) texto_privacidad = "Publico";
+            else if (alb->getPrivacidad() == 1) texto_privacidad = "Amigos";
+            
+            cout << cant_visibles + 1 << ". " << alb->getNombre() << " (" << texto_privacidad << ")\n";
+            cant_visibles++;
+        }
+    }
+    if (cant_visibles == 0) {
+        cout << "Este usuario no tiene albumes visibles para ti.\n";
+        delete[] indices_visibles; 
+        return;
+    }
+    int opcion;
+    cout << "\nElige el numero del album para ver fotos (0 para salir): ";
+    cin >> opcion;
+
+    if (opcion <= 0 || opcion > cant_visibles) {
+        delete[] indices_visibles;
+        return;
+    }
+    int indice_real = indices_visibles[opcion - 1];
+    Album* album_seleccionado = amigo.obtener_album(indice_real);
+    int cant_fotos = album_seleccionado->getCantidadFotos();
+
+    if (cant_fotos == 0) {
+        cout << "El album seleccionado no tiene fotos.\n";
+        delete[] indices_visibles;
+        return;
+    }
+
+    int foto_actual = 0;
+    bool en_carrusel = true;
+
+    while (en_carrusel) {
+        Foto* foto = album_seleccionado->obtener_foto(foto_actual);
+        
+        cout << "\n[ Foto " << foto_actual + 1 << " de " << cant_fotos << " ]\n";
+        cout << "Ruta: " << foto->getRuta() << "\n";
+        cout << "Fecha: " << foto->getFechaFoto() << "\n";
+        cout << "Likes: " << foto->getLikes() << "\n";
+        cout << "\n";
+        cout << "1. Siguiente foto\n";
+        cout << "2. Foto anterior\n";
+        cout << "3. Dar Like\n";
+        cout << "4. Quitar Like\n";
+        cout << "0. Salir del carrusel\n";
+        cout << "Seleccione una opcion: ";
+        
+        int accion;
+        cin >> accion;
+
+        if (accion == 1) {
+            foto_actual++;
+            if (foto_actual >= cant_fotos) {
+                foto_actual = 0;
+            }
+        } 
+        else if (accion == 2) {
+            foto_actual = foto_actual - 1;
+            if (foto_actual < 0) {
+                foto_actual = cant_fotos - 1;
+            }
+        } 
+        else if (accion == 3) {
+            foto->agregar_like(); 
+        }
+        else if (accion == 4) {
+            foto->quitar_like(); 
+        } 
+        else if (accion == 0) {
+            en_carrusel = false;
+        }
+    }
+    delete[] indices_visibles;
+}
+
 
 bool RedSocial::enviar_mensaje(int indice_emisor, const string& nombre_receptor, const string& texto, const string& fecha_envio) {
     if (indice_emisor < 0 || indice_emisor >= cantidad_usuarios) {
