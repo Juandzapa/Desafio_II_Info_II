@@ -534,8 +534,76 @@ void RedSocial::buscar_mensajes_rango(int indice_usuario, const string& fecha_in
     }
 }
 
-void RedSocial::cargar_datos(const string& archivo) {}
-void RedSocial::guardar_datos() const {}
+void RedSocial::cargar_datos(const string& archivo) {
+    ifstream archivo_lectura(archivo);
+    if (!archivo_lectura.is_open()) {
+        cout << "Error: No se encontro el archivo de datos base (" << archivo << ").\n";
+        return;
+    }
+    string linea;
+    while (getline(archivo_lectura, linea)) {
+        string datos_linea[10]; 
+        int cantidad_datos = 0;
+        string palabra_actual = "";
+
+        for (size_t i = 0; i < linea.length(); i++) {
+            if (linea[i] == ',') { //separador
+                if (cantidad_datos < 10) {
+                    datos_linea[cantidad_datos] = palabra_actual;
+                    cantidad_datos++;
+                }
+                palabra_actual = ""; 
+            } else {
+                palabra_actual += linea[i];
+            }
+        }
+        
+        if (cantidad_datos < 10) {
+            datos_linea[cantidad_datos] = palabra_actual;
+            cantidad_datos++;
+        }
+
+        if (cantidad_datos == 0) {
+            continue;
+        }
+
+        if (datos_linea[0] == "U" && cantidad_datos == 9) {
+            Usuario nuevo_u(datos_linea[1], datos_linea[2], datos_linea[3], datos_linea[4], datos_linea[5], datos_linea[6], datos_linea[7], datos_linea[8]);
+            agregar_usuario(nuevo_u);
+        }
+        else if (datos_linea[0] == "A" && cantidad_datos == 3) {
+            int ind1 = Buscar_usuario(datos_linea[1]);
+            int ind2 = Buscar_usuario(datos_linea[2]);
+            if (ind1 != -1 && ind2 != -1) {
+                establecer_amistad(ind1, ind2);
+            }
+        }
+    }
+
+    archivo_lectura.close();
+    cout << "Carga de datos exitosa. Total usuarios: " << cantidad_usuarios << "\n";
+}
+
+void RedSocial::guardar_datos() const {
+    ofstream archivo_salida("base_datos_salida.txt");
+    if (!archivo_salida.is_open()) {
+        cout << "Error: No se pudo crear el archivo para guardar los datos.\n";
+        return;
+    }
+    for (int i = 0; i < cantidad_usuarios; i++) {
+        archivo_salida << "U," << usuarios[i].getnombre_usuario() << "," << usuarios[i].getclave() << "," << usuarios[i].getfecha_nacimiento() << "," << usuarios[i].getcorreo() << "," << usuarios[i].getruta_foto() << "," << usuarios[i].getciudad() << "," << usuarios[i].getpais() << "," << usuarios[i].getfecha_inscripcion() << "\n";
+    }
+    for (int i = 0; i < cantidad_usuarios; i++) {
+        for (int j = i + 1; j < cantidad_usuarios; j++) {
+            if (amistades[i][j]) {
+                archivo_salida << "A," << usuarios[i].getnombre_usuario() << "," << usuarios[j].getnombre_usuario() << "\n";
+            }
+        }
+    }
+
+    archivo_salida.close();
+    cout << "Base de datos guardada exitosamente 'base_datos_salida.txt'.\n";
+}
 
 void RedSocial::reiniciar_iteraciones() {
     iteraciones_actuales = 0;
