@@ -343,7 +343,15 @@ void RedSocial::mostrar_sugerencias_amistad(int k, int indice_usuario) {
     delete[] comunes;
 }
 
-bool RedSocial::existe_solicitud(int indice_emisor, int indice_receptor) const { return false; }
+bool RedSocial::existe_solicitud(int indice_emisor, int indice_receptor) const {
+    if (indice_emisor < 0 || indice_emisor >= cantidad_usuarios || 
+        indice_receptor < 0 || indice_receptor >= cantidad_usuarios) {
+        return false;
+    }
+    string nombre_emisor = usuarios[indice_emisor].getnombre_usuario();
+    return (usuarios[indice_receptor].buscar_solicitud(nombre_emisor) != -1);
+}
+
 bool RedSocial::album_visible(int indice_visitante, int indice_dueno, const Album& album) const { return false; }
 
 bool RedSocial::enviar_solicitud_amistad(int indice_emisor, int indice_receptor) {
@@ -404,9 +412,128 @@ void RedSocial::mostrar_solicitudes_recibidas(int indice_usuario) const {
     }
 }
 void RedSocial::visitar_perfil_amigo(int indice_usuario, const string& nombre_amigo) {}
-bool RedSocial::enviar_mensaje(int indice_emisor, const string& nombre_receptor, const string& texto, const string& fecha_envio) { return true; }
-void RedSocial::leer_mensajes_nuevos(int indice_usuario) {}
-void RedSocial::buscar_mensajes_rango(int indice_usuario, const string& fecha_inicio, const string& fecha_fin) {}
+
+bool RedSocial::enviar_mensaje(int indice_emisor, const string& nombre_receptor, const string& texto, const string& fecha_envio) {
+    if (indice_emisor < 0 || indice_emisor >= cantidad_usuarios) {
+        return false;
+    }
+    int indice_receptor = Buscar_usuario(nombre_receptor);
+    if (indice_receptor == -1 || indice_emisor == indice_receptor) {
+        return false;
+    }
+    if (!son_amigos(indice_emisor, indice_receptor)) {
+        return false;
+    }
+    string emisor = usuarios[indice_emisor].getnombre_usuario();
+    Mensaje nuevo_mensaje(emisor, nombre_receptor, texto, fecha_envio, false);
+    usuarios[indice_emisor].enviar_mensaje(nuevo_mensaje);
+    usuarios[indice_receptor].recibir_mensaje(nuevo_mensaje);
+    return true;
+}
+
+void RedSocial::leer_mensajes_nuevos(int indice_usuario) {
+    if (indice_usuario < 0 || indice_usuario >= cantidad_usuarios) {
+        return;
+    }
+    Usuario& usuario_actual = usuarios[indice_usuario];
+    int cant_recibidos = usuario_actual.getcantidad_mensajesRecibidos();
+    bool hay_nuevos = false;
+
+    cout << "\nMensajes Nuevos (No Leidos)\n";
+    for (int i = 0; i < cant_recibidos; i++) {
+        Mensaje* msj = usuario_actual.obtener_mensaje_recibido(i);
+        if (msj != nullptr && !(*msj).isLeido()) {
+            cout << "De: " << (*msj).getEmisor() << " | Fecha: " << (*msj).getFechaEnvio() << "\n";
+            cout << "Texto: " << (*msj).getTexto() << "\n\n";
+            
+            usuario_actual.marcar_mensaje_leido(i);
+            hay_nuevos = true;
+        }
+    }
+    if (!hay_nuevos) {
+        cout << "No tienes mensajes nuevos.\n";
+    }
+}
+
+void RedSocial::buscar_mensajes_rango(int indice_usuario, const string& fecha_inicio, const string& fecha_fin) {
+    if (indice_usuario < 0 || indice_usuario >= cantidad_usuarios) {
+        return;
+    }
+    const Usuario& usuario_actual = usuarios[indice_usuario];
+    int cant_enviados = usuario_actual.getcantidad_mensajesEnviados();
+    int cant_recibidos = usuario_actual.getcantidad_mensajesRecibidos();
+
+    cout << "\nMensajes entre " << fecha_inicio << " y " << fecha_fin;
+
+    cout << "[Buzon de mensajes]\n";
+    for (int i = 0; i < cant_recibidos; i++) {
+        const Mensaje* msj = usuario_actual.obtener_mensaje_recibido(i);
+        if (msj != nullptr) {
+            string fecha_msj = (*msj).getFechaEnvio();
+            bool en_rango = true;
+
+            for (size_t c = 0; c < fecha_msj.length() && c < fecha_inicio.length(); c++) {
+                if (fecha_msj[c] > fecha_inicio[c]) {
+                    break; 
+                }
+                if (fecha_msj[c] < fecha_inicio[c]) { 
+                    en_rango = false; 
+                    break; 
+                }
+            }
+            if (en_rango) {
+                for (size_t c = 0; c < fecha_msj.length() && c < fecha_fin.length(); c++) {
+                    if (fecha_msj[c] < fecha_fin[c]) {
+                        break;
+                    }
+                    if (fecha_msj[c] > fecha_fin[c]) { 
+                        en_rango = false; 
+                        break; 
+                    }
+                }
+            }
+
+            if (en_rango) {
+                cout << "- De " << (*msj).getEmisor() << " (" << fecha_msj << "): " << (*msj).getTexto() << "\n";
+            }
+        }
+    }
+
+    cout << "\n[Bandeja de Salida]\n";
+    for (int i = 0; i < cant_enviados; i++) {
+        const Mensaje* msj = usuario_actual.obtener_mensaje_enviado(i);
+        if (msj != nullptr) {
+            string fecha_msj = (*msj).getFechaEnvio();
+            bool en_rango = true;
+
+            for (size_t c = 0; c < fecha_msj.length() && c < fecha_inicio.length(); c++) {
+                if (fecha_msj[c] > fecha_inicio[c]) {
+                    break;
+                }
+                if (fecha_msj[c] < fecha_inicio[c]) { 
+                    en_rango = false; 
+                    break; 
+                }
+            }
+            if (en_rango) {
+                for (size_t c = 0; c < fecha_msj.length() && c < fecha_fin.length(); c++) {
+                    if (fecha_msj[c] < fecha_fin[c]) {
+                        break;
+                    }
+                    if (fecha_msj[c] > fecha_fin[c]) { 
+                        en_rango = false; 
+                        break; 
+                    }
+                }
+            }
+
+            if (en_rango) {
+                cout << "- Para " << (*msj).getReceptor() << " (" << fecha_msj << "): " << (*msj).getTexto() << "\n";
+            }
+        }
+    }
+}
+
 void RedSocial::cargar_datos(const string& archivo) {}
 void RedSocial::guardar_datos() const {}
 
