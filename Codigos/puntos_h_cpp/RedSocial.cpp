@@ -5,8 +5,6 @@
 #include <ctime>   
 using namespace std;
 
-//CONSTRUCTORES Y DESTRUCTOR
-
 RedSocial::RedSocial() {
     cantidad_usuarios = 0;
     capacidad_usuarios = 10;
@@ -98,8 +96,6 @@ void RedSocial::liberar_datos() {
     }
 }
 
-//MEMORIA DINÁMICA
-
 void RedSocial::ampliar_usuarios() {
     int nueva_capacidad = capacidad_usuarios + 10;
     Usuario* usuarios_ampliados = new Usuario[nueva_capacidad];
@@ -135,8 +131,6 @@ void RedSocial::ampliar_matriz_amistades() {
 
     amistades = nueva_matriz;
 }
-
-//UTILIDADES-USUARIO
 
 bool RedSocial::agregar_usuario(const Usuario& nuevo_usuario) {
     if (Buscar_usuario(nuevo_usuario.getnombre_usuario()) != -1) {
@@ -284,10 +278,10 @@ void RedSocial::seleccionar_mejores_amigos(int indice_usuario, bool excluir_ante
 
 void RedSocial::mostrar_mejores_amigos(int indice_usuario) {
     if (!mejores_amigos_inicializados) seleccionar_mejores_amigos(indice_usuario, false);
-    cout << "\n-- Fotos de mejores amigos --\n";
+    cout << "\n Amigos: \n";
     for (int i = 0; i < 3; i++) {
         if (mejores_amigos_indices[i] != -1) {
-            cout << "Amigo " << i+1 << ": " << usuarios[mejores_amigos_indices[i]].getnombre_usuario() << endl;
+            cout << "Amigo " << (i + 1) << ": " << usuarios[mejores_amigos_indices[i]].getnombre_usuario() << "- [Ruta de Foto]: " << usuarios[mejores_amigos_indices[i]].getruta_foto() << "\n" << endl;
         }
     }
 }
@@ -355,7 +349,6 @@ bool RedSocial::existe_solicitud(int indice_emisor, int indice_receptor) const {
 bool RedSocial::album_visible(int indice_visitante, int indice_dueno, const Album& album) const {
     short privacidad = album.getPrivacidad(); 
     
-    // Convencion numerica de privacidad (short): 0 = Publico, 1 = Amigos, 2 = Privado
     if (privacidad == 0) {
         return true;
     }
@@ -436,7 +429,7 @@ void RedSocial::visitar_perfil_amigo(int indice_usuario, const string& nombre_am
         cout << "Error: El usuario no existe.\n";
         return;
     }
-    if (!son_amigos(indice_usuario, indice_amigo)) {
+    if (indice_usuario != indice_amigo && !son_amigos(indice_usuario, indice_amigo)) {
         cout << "Error: " << nombre_amigo << " no es tu amigo. No puedes ver sus albumes.\n";
         return;
     }
@@ -551,27 +544,54 @@ bool RedSocial::enviar_mensaje(int indice_emisor, const string& nombre_receptor,
 }
 
 void RedSocial::leer_mensajes_nuevos(int indice_usuario) {
-    if (indice_usuario < 0 || indice_usuario >= cantidad_usuarios) {
-        return;
-    }
+    if (indice_usuario < 0 || indice_usuario >= cantidad_usuarios) return;
     Usuario& usuario_actual = usuarios[indice_usuario];
     int cant_recibidos = usuario_actual.getcantidad_mensajesRecibidos();
-    bool hay_nuevos = false;
-
-    cout << "\nMensajes Nuevos (No Leidos)\n";
+    
+    Mensaje** no_leidos = new Mensaje*[cant_recibidos];
+    int* indices_reales = new int[cant_recibidos];
+    int cant_no_leidos = 0;
+    
     for (int i = 0; i < cant_recibidos; i++) {
         Mensaje* msj = usuario_actual.obtener_mensaje_recibido(i);
-        if (msj != nullptr && !(*msj).isLeido()) {
-            cout << "De: " << (*msj).getEmisor() << " | Fecha: " << (*msj).getFechaEnvio() << "\n";
-            cout << "Texto: " << (*msj).getTexto() << "\n\n";
-            
-            usuario_actual.marcar_mensaje_leido(i);
-            hay_nuevos = true;
+        if (msj != nullptr && !msj->isLeido()) {
+            no_leidos[cant_no_leidos] = msj;
+            indices_reales[cant_no_leidos] = i;
+            cant_no_leidos++;
         }
     }
-    if (!hay_nuevos) {
+    
+    if (cant_no_leidos == 0) {
         cout << "No tienes mensajes nuevos.\n";
+        delete[] no_leidos;
+        delete[] indices_reales;
+        return;
     }
+    
+    for (int i = 1; i < cant_no_leidos; i++) {
+        Mensaje* msj_aux = no_leidos[i];
+        int ind_aux = indices_reales[i];
+        int j = i - 1;
+
+        while (j >= 0 && no_leidos[j]->getFechaEnvio() > msj_aux->getFechaEnvio()) {
+            no_leidos[j + 1] = no_leidos[j];
+            indices_reales[j + 1] = indices_reales[j];
+            j--;
+        }
+        no_leidos[j + 1] = msj_aux;
+        indices_reales[j + 1] = ind_aux;
+    }
+    
+    cout << "\nMensajes Nuevos (No Leidos)\n";
+    for (int i = 0; i < cant_no_leidos; i++) {
+        cout << "De: " << no_leidos[i]->getEmisor() << " | Fecha: " << no_leidos[i]->getFechaEnvio() << "\n";
+        cout << "Texto: " << no_leidos[i]->getTexto() << "\n\n";
+        
+        usuario_actual.marcar_mensaje_leido(indices_reales[i]);
+    }
+    
+    delete[] no_leidos;
+    delete[] indices_reales;
 }
 
 void RedSocial::buscar_mensajes_rango(int indice_usuario, const string& fecha_inicio, const string& fecha_fin) {
@@ -666,7 +686,7 @@ void RedSocial::cargar_datos(const string& archivo) {
         string palabra_actual = "";
 
         for (size_t i = 0; i < linea.length(); i++) {
-            if (linea[i] == ',') { //separador
+            if (linea[i] == ',') { 
                 if (cantidad_datos < 10) {
                     datos_linea[cantidad_datos] = palabra_actual;
                     cantidad_datos++;
@@ -682,19 +702,67 @@ void RedSocial::cargar_datos(const string& archivo) {
             cantidad_datos++;
         }
 
-        if (cantidad_datos == 0) {
-            continue;
-        }
+        if (cantidad_datos == 0) continue;
 
-        if (datos_linea[0] == "U" && cantidad_datos == 9) {
+        if (datos_linea[0] == "U" && cantidad_datos >= 9) {
             Usuario nuevo_u(datos_linea[1], datos_linea[2], datos_linea[3], datos_linea[4], datos_linea[5], datos_linea[6], datos_linea[7], datos_linea[8]);
             agregar_usuario(nuevo_u);
         }
-        else if (datos_linea[0] == "A" && cantidad_datos == 3) {
+        else if (datos_linea[0] == "A" && cantidad_datos >= 3) {
             int ind1 = Buscar_usuario(datos_linea[1]);
             int ind2 = Buscar_usuario(datos_linea[2]);
             if (ind1 != -1 && ind2 != -1) {
                 establecer_amistad(ind1, ind2);
+            }
+        }
+        else if (datos_linea[0] == "B" && cantidad_datos >= 5) {
+            int ind_dueño = Buscar_usuario(datos_linea[1]);
+            if (ind_dueño != -1) {
+                short priv = 0;
+                if (datos_linea[4] == "1") priv = 1;
+                else if (datos_linea[4] == "2") priv = 2;
+                
+                Album nuevo_album(datos_linea[2], datos_linea[3], priv);
+                usuarios[ind_dueño].agregar_album(nuevo_album);
+            }
+        }
+        else if (datos_linea[0] == "F" && cantidad_datos >= 7) {
+            int ind_dueño = Buscar_usuario(datos_linea[1]);
+            if (ind_dueño != -1) {
+                Usuario& dueño = usuarios[ind_dueño];
+                int cant_albumes = dueño.getcantidad_albumes();
+                for(int i = 0; i < cant_albumes; i++) {
+                    Album* alb = dueño.obtener_album(i);
+                    if(alb->getNombre() == datos_linea[2]) {
+                        int likes = 0;
+                        float dim = 0.0f;
+                        try {
+                            likes = stoi(datos_linea[5]);
+                            dim = stof(datos_linea[6]);
+                        } catch(...) {} 
+                        
+                        Foto nueva_foto(datos_linea[4], dim, datos_linea[3], likes);
+                        alb->agregar_foto(nueva_foto);
+                        break; 
+                    }
+                }
+            }
+        }
+        else if (datos_linea[0] == "M" && cantidad_datos >= 6) {
+            int ind_emisor = Buscar_usuario(datos_linea[1]);
+            int ind_receptor = Buscar_usuario(datos_linea[2]);
+            if (ind_emisor != -1 && ind_receptor != -1) {
+                bool leido = (datos_linea[5] == "1");
+                Mensaje nuevo_mensaje(datos_linea[1], datos_linea[2], datos_linea[3], datos_linea[4], leido);
+                usuarios[ind_emisor].enviar_mensaje(nuevo_mensaje);
+                usuarios[ind_receptor].recibir_mensaje(nuevo_mensaje);
+            }
+        }
+        else if (datos_linea[0] == "S" && cantidad_datos >= 4) {
+            int ind_receptor = Buscar_usuario(datos_linea[2]);
+            if (ind_receptor != -1) {
+                Solicitudes nueva_solicitud(datos_linea[1], datos_linea[3]);
+                usuarios[ind_receptor].agregar_solicitud(nueva_solicitud);
             }
         }
     }
@@ -704,14 +772,16 @@ void RedSocial::cargar_datos(const string& archivo) {
 }
 
 void RedSocial::guardar_datos() const {
-    ofstream archivo_salida("base_datos_salida.txt");
+    ofstream archivo_salida("udebook.txt");
     if (!archivo_salida.is_open()) {
         cout << "Error: No se pudo crear el archivo para guardar los datos.\n";
         return;
     }
+    
     for (int i = 0; i < cantidad_usuarios; i++) {
         archivo_salida << "U," << usuarios[i].getnombre_usuario() << "," << usuarios[i].getclave() << "," << usuarios[i].getfecha_nacimiento() << "," << usuarios[i].getcorreo() << "," << usuarios[i].getruta_foto() << "," << usuarios[i].getciudad() << "," << usuarios[i].getpais() << "," << usuarios[i].getfecha_inscripcion() << "\n";
     }
+    
     for (int i = 0; i < cantidad_usuarios; i++) {
         for (int j = i + 1; j < cantidad_usuarios; j++) {
             if (amistades[i][j]) {
@@ -720,8 +790,51 @@ void RedSocial::guardar_datos() const {
         }
     }
 
+    for (int i = 0; i < cantidad_usuarios; i++) {
+        const Usuario& user = usuarios[i];
+        int cant_alb = user.getcantidad_albumes();
+        for (int j = 0; j < cant_alb; j++) {
+            const Album* alb = user.obtener_album(j);
+            if(alb != nullptr) {
+                archivo_salida << "B," << user.getnombre_usuario() << "," << alb->getNombre() << "," << alb->getRutaAlmacenamiento() << "," << alb->getPrivacidad() << "\n";
+                
+                int cant_fotos = alb->getCantidadFotos();
+                for(int k = 0; k < cant_fotos; k++) {
+                    const Foto* foto = alb->obtener_foto(k);
+                    if(foto != nullptr) {
+                        archivo_salida << "F," << user.getnombre_usuario() << "," << alb->getNombre() << "," << foto->getRuta() << "," << foto->getFechaFoto() << "," << foto->getLikes() << "," << foto->getDimension() << "\n";
+                    }
+                }
+            }
+        }
+    }
+
+    for (int i = 0; i < cantidad_usuarios; i++) {
+        const Usuario& user = usuarios[i];
+        int cant_enviados = user.getcantidad_mensajesEnviados();
+        for (int j = 0; j < cant_enviados; j++) {
+            const Mensaje* msj = user.obtener_mensaje_enviado(j);
+            if (msj != nullptr) {
+                archivo_salida << "M," << msj->getEmisor() << "," << msj->getReceptor() << "," 
+                               << msj->getTexto() << "," << msj->getFechaEnvio() << "," 
+                               << (msj->isLeido() ? "1" : "0") << "\n";
+            }
+        }
+    }
+
+    for (int i = 0; i < cantidad_usuarios; i++) {
+        const Usuario& user = usuarios[i];
+        int cant_sol = user.getcantidad_solicitudes();
+        for (int j = 0; j < cant_sol; j++) {
+            const Solicitudes* sol = user.obtener_solicitud(j);
+            if (sol != nullptr) {
+                archivo_salida << "S," << sol->getEmisor() << "," << user.getnombre_usuario() << "," << sol->getFechaEnvio() << "\n";
+            }
+        }
+    }
+
     archivo_salida.close();
-    cout << "Base de datos guardada exitosamente 'base_datos_salida.txt'.\n";
+    cout << "Base de datos guardada exitosamente en 'udebook.txt'.\n";
 }
 
 void RedSocial::reiniciar_iteraciones() {
